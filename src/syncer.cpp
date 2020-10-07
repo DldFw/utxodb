@@ -3,6 +3,7 @@
 #include "db_mysql.h"
 #include <gmp.h>
 #include <gmpxx.h>
+#include "task_helpers.h"
 std::map<std::string, int> s_map_address_id;
 static void SetTimeout(const std::string& name, int second)
 {
@@ -31,6 +32,49 @@ void Syncer::refreshDB()
         vect_sql_.clear();
     }   
     LOG(INFO) << "refresh DB end" ;
+}
+
+static std::vector<std::string> FormatTransaction(Rpc& rpc, std::string txid)
+{
+	json json_tx;
+	rpc.getRawTransaction(txid, json_tx);
+
+	json json_vins = json_tx["result"]["vin"];
+	json json_vouts = json_tx["result"]["vout"];
+	std::vector<std::string> vect_sql;
+	for (int k = 0; k < json_vins.size(); k++)
+	{
+		if (json_vins[k].find("txid") == json_vins[k].end())
+		{
+			continue;
+		}
+		std::string del_txid = json_vins[k]["txid"].get<std::string>();
+		int del_n = json_vins[k]["vout"].get<int>();
+		std::string sql = "DELETE FROM unspent WHERE txid ='" +del_txid+ "' AND n='"+ std::to_string(del_n) +"';";
+		vect_sql.push_back(sql);
+	}
+
+	for (int k = 0; k < json_vouts.size(); k++)
+	{
+		double value = json_vouts[k]["value"].get<double>();
+
+		if (value  <= 0.000000001 )
+		{
+			continue;
+		}
+
+		int n = json_vouts[k]["n"].get<int>();
+		std::string pubkey = json_vouts[k]["scriptPubKey"]["hex"].get<std::string>();
+		if (json_vouts[k]["scriptPubKey"].find("addresses") == json_vouts[k]["scriptPubKey"].end())
+		{
+			continue;
+		}
+
+		std::string address = json_vouts[k]["scriptPubKey"]["addresses"][0].get<std::string>();
+		std::string sql  = "INSERT INTO `unspent` VALUES ('" + txid  + "', '"+std::to_string(n)+"', '"+ std::to_string(value) +"', '"+ address +"', '" + pubkey +"');";
+		vect_sql.push_back(sql);
+	}
+	return vect_sql;
 }
 
 void Syncer::scanBlockChain()
@@ -66,9 +110,16 @@ void Syncer::scanBlockChain()
             break;  
         }
 		json json_txs = json_block["result"]["tx"];
+	
+		CThreadPool<CQueueAdaptor> pool { "TestPool", 8 };
+    	std::vector<std::future<std::vector<std::string>> > results {};
+
+
 		for (int j = 0; j < json_txs.size(); j++)
 		{
 			std::string txid = json_txs[j].get<std::string>();
+
+    		results.push_back(make_task(pool,FormatTransaction, rpc_, txid));
 			json json_tx;
 			rpc_.getRawTransaction(txid, json_tx);
 
