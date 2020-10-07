@@ -38,12 +38,12 @@ void Syncer::scanBlockChain()
     //check height which is needed to upate
 	
 	uint64_t pre_height = 0;
-	std::string sql = "select height from block order by height desc limit 1;";
+	std::string sql_height = "select height from block order by height desc limit 1;";
 	std::map<int,DBMysql::DataType> map_col_type;
 	map_col_type[0] = DBMysql::INT;
 
 	json json_data;
-	g_db_mysql->getData(sql, map_col_type, json_data);
+	g_db_mysql->getData(sql_height, map_col_type, json_data);
 	if (json_data.size() > 0)
 	{
 		pre_height = json_data[0][0].get<uint64_t>();
@@ -77,14 +77,13 @@ void Syncer::scanBlockChain()
 
 			for (int k = 0; k < json_vins.size(); k++)
 			{
-				if (json_vins[k].find("txid") == json_vins.end())
+				if (json_vins[k].find("txid") == json_vins[k].end())
 				{
 					continue;
 				}
 				std::string del_txid = json_vins[k]["txid"].get<std::string>();
-				int del_n = json_vins[k]["n"].get<int>();
-
-				std::string sql = "DELETE FROM unspent WHERE txid ='" +del_txid+ "' AND '"+ std::to_string(del_n) +"';";
+				int del_n = json_vins[k]["vout"].get<int>();
+				std::string sql = "DELETE FROM unspent WHERE txid ='" +del_txid+ "' AND n='"+ std::to_string(del_n) +"';";
 				vect_sql_.push_back(sql);
 			}
 			
@@ -99,19 +98,23 @@ void Syncer::scanBlockChain()
 				
 				int n = json_vouts[k]["n"].get<int>();
 				std::string pubkey = json_vouts[k]["scriptPubKey"]["hex"].get<std::string>();
-				std::string address = json_vouts[k]["scriptPubKey"]["addresses"][0].get<std::string>();
+				if (json_vouts[k]["scriptPubKey"].find("addresses") == json_vouts[k]["scriptPubKey"].end())
+				{
+					continue;
+				}
 
+				std::string address = json_vouts[k]["scriptPubKey"]["addresses"][0].get<std::string>();
 				std::string sql  = "INSERT INTO `unspent` VALUES ('" + txid  + "', '"+std::to_string(n)+"', '"+ std::to_string(value) +"', '"+ address +"', '" + pubkey +"');";
 				vect_sql_.push_back(sql);
 			}
 		}
         //LOG(INFO) << "block height: " << i;
-        if(i % 100 == 0 || i == cur_height)
+        if(i % 5 == 0 || i == cur_height)
         {
 
             LOG(INFO) << "block height: " << i;
-            std::string timestamps = json_block["result"]["timestamp"].get<std::string>();
-            std::string hash = json_block["result"]["hash"].get<std::string>();
+            //std::string timestamps = json_block["result"]["timestamp"].get<std::string>();
+            //std::string hash = json_block["result"]["hash"].get<std::string>();
             //INSERT INTO `xsvdb`.`block` (`height`, `timestamps`) VALUES ('23', '123123');
             std::string sql = "INSERT INTO `block` VALUES ('" + std::to_string(i) + "');";
             vect_sql_.push_back(sql);

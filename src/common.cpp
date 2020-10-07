@@ -46,7 +46,7 @@ bool CurlPostParams(const CurlParams &params, std::string &response)
     }
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
-
+	//LOG(INFO) <<  response;
     if (res != CURLE_OK)
     {
         error_str = curl_easy_strerror(res);
