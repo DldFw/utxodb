@@ -77,6 +77,7 @@ bool Rpc::getBlock(const uint64_t& height, json& json_block)
     //    json json_response;	
     if ( !rpcNode(json_post, json_block) )
     {
+		LOG(ERROR) << json_block.dump(4);
         return false;
     }
 	
@@ -94,6 +95,7 @@ bool Rpc::getRawTransaction(const std::string& txid, json& json_tx)
     structRpc("getrawtransaction", json_params, json_post);
     if ( !rpcNode(json_post, json_tx) )
     {
+		LOG(ERROR) << json_tx.dump(4);
         return false;
     }
 
