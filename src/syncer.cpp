@@ -18,7 +18,7 @@ static void ScanChain(int fd, short kind, void *ctx)
     LOG(INFO) << "scan block begin ";
 
     Syncer::instance().scanBlockChain(); 
-    SetTimeout("ScanChain", 10*60);
+    SetTimeout("ScanChain", 60);
 }
 
 
@@ -57,7 +57,7 @@ static std::vector<std::string> FormatTransaction(Rpc& rpc, std::string txid)
 	{
 		double value = json_vouts[k]["value"].get<double>();
 
-		if (value  <= 0.000000001 )
+		if (value  <= 0.00000002 )
 		{
 			continue;
 		}
@@ -75,11 +75,9 @@ static std::vector<std::string> FormatTransaction(Rpc& rpc, std::string txid)
 	}
 	return vect_sql;
 }
-
+static CThreadPool<CQueueAdaptor> pool { "TxPool", 12 };
 void Syncer::scanBlockChain()
 {
-    //check height which is needed to upate
-	
 	uint64_t pre_height = 0;
 	std::string sql_height = "select height from block order by height desc limit 1;";
 	std::map<int,DBMysql::DataType> map_col_type;
@@ -92,14 +90,14 @@ void Syncer::scanBlockChain()
 		pre_height = json_data[0][0].get<uint64_t>();
 	}
 
-
-	uint64_t cur_height = pre_height;
-	rpc_.getBlockCount(cur_height);
-	json json_block;
-
-	end_ = cur_height;
 	try 
-	{
+	{	
+		uint64_t cur_height = pre_height;
+		rpc_.getBlockCount(cur_height);
+		json json_block;
+		end_ = cur_height;
+
+		begin_ = pre_height;
 		for (int i = pre_height + 1; i <= cur_height; i++)
 		{
 			json_block.clear();
@@ -112,9 +110,9 @@ void Syncer::scanBlockChain()
 			}
 			json json_txs = json_block["result"]["tx"];
 
-			CThreadPool<CQueueAdaptor> pool { "TxPool", 12 };
+	//		CThreadPool<CQueueAdaptor> pool { "TxPool", 12 };
 			std::vector<std::future<std::vector<std::string>> > results {};
-			for (int j = 0; j < json_txs.size(); j++)
+			for (int j = 1; j < json_txs.size(); j++)
 			{
 				std::string txid = json_txs[j].get<std::string>();
 				results.push_back(make_task(pool,FormatTransaction, rpc_, txid));
@@ -132,9 +130,6 @@ void Syncer::scanBlockChain()
 			{
 
 				LOG(INFO) << "block height: " << i;
-				//std::string timestamps = json_block["result"]["timestamp"].get<std::string>();
-				//std::string hash = json_block["result"]["hash"].get<std::string>();
-				//INSERT INTO `xsvdb`.`block` (`height`, `timestamps`) VALUES ('23', '123123');
 				std::string sql = "INSERT INTO `block` VALUES ('" + std::to_string(i) + "');";
 				vect_sql_.push_back(sql);
 				refreshDB();
