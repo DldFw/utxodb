@@ -84,6 +84,24 @@ bool Rpc::getBlock(const uint64_t& height, json& json_block)
     return true;
 }
 
+bool Rpc::getRawMempool(json& json_rawmempool)
+{
+    json json_post;
+    json json_params = json::array();
+
+    json_post["params"] = json_params;
+    structRpc("getrawmempool", json_params, json_post);
+    //    json json_response;	
+    json json_block;
+    if ( !rpcNode(json_post, json_block) )
+    {
+        return false;
+    }
+	json_rawmempool = json_block["result"];
+	
+    return true;
+}
+        
 bool Rpc::getRawTransaction(const std::string& txid, json& json_tx)
 {
     json json_post;

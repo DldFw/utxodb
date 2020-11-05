@@ -22,8 +22,7 @@ public:
 
 	bool getRawTransaction(const std::string& txid, json& json_tx);
 
-	bool getRawMempool(json& json_mempool);
-
+    bool getRawMempool(json& json_rawmempool);
 public:
     bool setRpc(std::string node_url, std::string auth)
     {

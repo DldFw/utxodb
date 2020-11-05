@@ -34,7 +34,7 @@ void Syncer::refreshDB()
     LOG(INFO) << "refresh DB end" ;
 }
 
-static std::vector<std::string> FormatTransaction(Rpc& rpc, std::string txid)
+static std::vector<std::string> FormatRawChain(Rpc& rpc, std::string txid)
 {
 	json json_tx;
 	rpc.getRawTransaction(txid, json_tx);
@@ -49,7 +49,7 @@ static std::vector<std::string> FormatTransaction(Rpc& rpc, std::string txid)
 		}
 		std::string del_txid = json_vins[k]["txid"].get<std::string>();
 		int del_n = json_vins[k]["vout"].get<int>();
-		std::string sql = "DELETE FROM unspent WHERE txid ='" +del_txid+ "' AND n='"+ std::to_string(del_n) +"';";
+		std::string sql = "DELETE FROM `unspent` WHERE txid ='" +del_txid+ "' AND n='"+ std::to_string(del_n) +"';";
 		vect_sql.push_back(sql);
 	}
 
@@ -75,6 +75,50 @@ static std::vector<std::string> FormatTransaction(Rpc& rpc, std::string txid)
 	}
 	return vect_sql;
 }
+
+static std::vector<std::string> FormatRawMempool(Rpc& rpc, std::string txid)
+{
+	json json_tx;
+    rpc.getRawTransaction(txid, json_tx);
+	json json_vins = json_tx["result"]["vin"];
+	json json_vouts = json_tx["result"]["vout"];
+	std::vector<std::string> vect_sql;
+	for (int k = 0; k < json_vins.size(); k++)
+	{
+		if (json_vins[k].find("txid") == json_vins[k].end())
+		{
+			continue;
+		}
+		std::string del_txid = json_vins[k]["txid"].get<std::string>();
+		int del_n = json_vins[k]["vout"].get<int>();
+
+		std::string sql  = "INSERT INTO `rawmempoolvin` VALUES ('" + del_txid  + "', '"+std::to_string(del_n) + "');";
+		vect_sql.push_back(sql);
+	}
+
+	for (int k = 0; k < json_vouts.size(); k++)
+	{
+		double value = json_vouts[k]["value"].get<double>();
+
+		if (value  <= 0.00000002 )
+		{
+			continue;
+		}
+
+		int n = json_vouts[k]["n"].get<int>();
+		std::string pubkey = json_vouts[k]["scriptPubKey"]["hex"].get<std::string>();
+		if (json_vouts[k]["scriptPubKey"].find("addresses") == json_vouts[k]["scriptPubKey"].end())
+		{
+			continue;
+		}
+
+		std::string address = json_vouts[k]["scriptPubKey"]["addresses"][0].get<std::string>();
+		std::string sql  = "INSERT INTO `rawmempool` VALUES ('" + txid  + "', '"+std::to_string(n)+"', '"+ std::to_string(value) +"', '"+ address +"', '" + pubkey +"');";
+		vect_sql.push_back(sql);
+	}
+	return vect_sql;
+}
+
 static CThreadPool<CQueueAdaptor> pool { "TxPool", 12 };
 void Syncer::scanBlockChain()
 {
@@ -115,7 +159,7 @@ void Syncer::scanBlockChain()
 			for (int j = 1; j < json_txs.size(); j++)
 			{
 				std::string txid = json_txs[j].get<std::string>();
-				results.push_back(make_task(pool,FormatTransaction, rpc_, txid));
+				results.push_back(make_task(pool,FormatRawChain, rpc_, txid));
 			}
 
 			LOG(INFO) << "TASK END";
@@ -136,6 +180,28 @@ void Syncer::scanBlockChain()
 				begin_ = i;	
 			}
 		}
+        
+        LOG(INFO) << "scan mempool ";
+        json json_rawmempool;
+        rpc_.getRawMempool(json_rawmempool);
+
+        std::vector<std::future<std::vector<std::string>> > results {};
+		for (int i = 0; i < json_rawmempool.size(); i++)
+		{
+			std::string txid = json_rawmempool[i].get<std::string>();
+			results.push_back(make_task(pool,FormatRawMempool, rpc_, txid));
+        }
+
+        LOG(INFO) << "get mem pool txs";
+        for(auto& res: results)
+        {
+            std::vector<std::string> vect_sql = res.get();
+            for(int k =0; k < vect_sql.size(); k++)
+                vect_sql_.push_back(vect_sql[k]);
+        }
+
+        refreshDB();
+
 	}
 	catch(...)
 	{
