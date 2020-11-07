@@ -21,7 +21,7 @@ set(base_src src/main.cpp
 set(job_src src/job/base.cpp
 			src/job/job.cpp)
 
-set(link_lib curl mysqlclient event boost_system boost_filesystem boost_program_options glog gmp gmpxx threadcontral)
+set(link_lib curl mysqlclient pthread event  event_pthreads  boost_system boost_filesystem boost_program_options glog gmp gmpxx threadcontral)
 
 add_executable(dbutxo ${base_src} ${job_src})
 
