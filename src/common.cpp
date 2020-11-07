@@ -189,7 +189,7 @@ bool EventPostParams(const std::string& str_request, std::string& reply)
     event_base_dispatch(base.get());
 
     reply = response.body;
-    std::cout <<reply << std::endl;
+//    std::cout <<reply << std::endl;
     return true;
  /*if (response.status == 0)
     {
@@ -221,6 +221,8 @@ bool EventPostParams(const std::string& str_request, std::string& reply)
 
 bool CurlPostParams(const CurlParams &params, std::string &response)
 {
+    return EventPostParams(params.data, response);
+
     CURL *curl = curl_easy_init();
     struct curl_slist *headers = NULL;
     CURLcode res;

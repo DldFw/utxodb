@@ -128,7 +128,7 @@ static std::vector<std::string> FormatRawMempool(Rpc& rpc, std::string txid)
 	return vect_sql;
 }
 
-static CThreadPool<CQueueAdaptor> pool { "TxPool", 4 };
+static CThreadPool<CQueueAdaptor> pool { "TxPool", 12 };
 void Syncer::scanBlockChain()
 {
 	uint64_t pre_height = 0;
@@ -145,7 +145,7 @@ void Syncer::scanBlockChain()
 
 	try 
 	{	
-/*		uint64_t cur_height = pre_height;
+		uint64_t cur_height = pre_height;
 		rpc_.getBlockCount(cur_height);
 		json json_block;
 		end_ = cur_height;
@@ -188,48 +188,26 @@ void Syncer::scanBlockChain()
 				refreshDB();
 				begin_ = i;	
 			}
-		}*/
+		}
         
         LOG(INFO) << "scan mempool ";
         json json_rawmempool;
         rpc_.getRawMempool(json_rawmempool);
 
-        std::cout << "beign scan mem pool size: "  << json_rawmempool.size() << std::endl;
-        int n = 0;
-        int nmode = 2000;
-        bool all = false;
- //       while (true)
+        std::vector<std::future<std::vector<std::string>> > results {};
+        for (int i = 0 ; i < json_rawmempool.size(); i++)
         {
-
-            std::vector<std::future<std::vector<std::string>> > results {};
-            int i = n;
-            std::cout << " can cursor: " << i << std::endl;
-            for ( ; i < json_rawmempool.size(); i++)
-            {
-                n++;
-                std::string txid = json_rawmempool[i].get<std::string>();
-                results.push_back(make_task(pool,FormatRawMempool, rpc_, txid));
-  /*              if ((i+1) % nmode == 0)
-                {
-                    break;
-                }
-                if (i  == json_rawmempool.size() -1)
-                    all = true;*/
-            }
-
-            LOG(INFO) << "get mem pool txs";
-            for(auto& res: results)
-            {
-                std::vector<std::string> vect_sql = res.get();
-            /*    for(int k =0; k < vect_sql.size(); k++)
-                    vect_sql_.push_back(vect_sql[k]);*/
-            }
-           /* if(all)
-            {
-                break;
-            }*/
+            std::string txid = json_rawmempool[i].get<std::string>();
+            results.push_back(make_task(pool,FormatRawMempool, rpc_, txid));
         }
-        std::cout << "can't get txid size: " << s_vect_txids.size() << std::endl;
+
+        LOG(INFO) << "get mem pool txs";
+        for(auto& res: results)
+        {
+            std::vector<std::string> vect_sql = res.get();
+            for(int k =0; k < vect_sql.size(); k++)
+                vect_sql_.push_back(vect_sql[k]);
+        }
 
         refreshDB();
 
@@ -237,10 +215,10 @@ void Syncer::scanBlockChain()
 	catch(...)
 	{
 		LOG(ERROR) << "from: "  << begin_ << " to: " << end_;
-	/*	if (end_ - begin_ > 1)
+		if (end_ - begin_ > 1)
 		{
 			scanBlockChain();
-		}*/
+		}
 	}
 
 }
