@@ -1,16 +1,19 @@
 {
 	"logpath":"./log",
 	"daemon":true,
-	"nodeurl":"http://127.0.0.1:8545/",
+    "node":
+    {
+	"url":"http://192.168.3.203:8332/",
 	"auth":"dev:a",
-	"begin": 10300000,
-	"end":   10319025,
+    "host":"192.168.3.203",
+    "port": 8332
+    },
 	"mysql":
 	{
-		"url":"127.0.0.1",
+		"url":"192.168.1.11",
 		"user": "root",
-		"pass": "password",
-		"db": "ethdb",
+		"pass": "a",
+		"db": "utilutxo",
 		"port": 3306
 	}
 }

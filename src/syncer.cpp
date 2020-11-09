@@ -82,16 +82,14 @@ static std::vector<std::string> FormatRawMempool(Rpc& rpc, std::string txid)
 	json json_tx;
     bool ret = rpc.getRawTransaction(txid, json_tx);
 
+	std::vector<std::string> vect_sql;
     if (!ret)
     {
-        LOG(ERROR) << "format error: ";
-        s_vect_txids.push_back(txid);
-        return s_vect_txids;
-        
+        LOG(ERROR) << "format error: " << txid;
+        return vect_sql; 
     }
 	json json_vins = json_tx["result"]["vin"];
 	json json_vouts = json_tx["result"]["vout"];
-	std::vector<std::string> vect_sql;
 	for (int k = 0; k < json_vins.size(); k++)
 	{
 		if (json_vins[k].find("txid") == json_vins[k].end())
@@ -162,8 +160,6 @@ void Syncer::scanBlockChain()
 				break;  
 			}
 			json json_txs = json_block["result"]["tx"];
-
-	//		CThreadPool<CQueueAdaptor> pool { "TxPool", 12 };
 			std::vector<std::future<std::vector<std::string>> > results {};
 			for (int j = 1; j < json_txs.size(); j++)
 			{
@@ -171,7 +167,7 @@ void Syncer::scanBlockChain()
 				results.push_back(make_task(pool,FormatRawChain, rpc_, txid));
 			}
 
-			LOG(INFO) << "TASK END";
+		    //LOG(INFO) << "TASK END";
 			for(auto& res: results)
 			{
 				std::vector<std::string> vect_sql = res.get();
@@ -200,15 +196,19 @@ void Syncer::scanBlockChain()
             std::string txid = json_rawmempool[i].get<std::string>();
             results.push_back(make_task(pool,FormatRawMempool, rpc_, txid));
         }
-
-        LOG(INFO) << "get mem pool txs";
+        
+        //clear mempool
+        {
+            vect_sql_.push_back("DELETE FROM rawmempoolvin");
+            vect_sql_.push_back("DELETE FROM rawmempool;");
+        }
+        //LOG(INFO) << "get mem pool txs";
         for(auto& res: results)
         {
             std::vector<std::string> vect_sql = res.get();
             for(int k =0; k < vect_sql.size(); k++)
                 vect_sql_.push_back(vect_sql[k]);
         }
-
         refreshDB();
 
 	}

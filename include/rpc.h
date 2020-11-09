@@ -8,10 +8,12 @@ class Rpc
 public:
     Rpc()
     {
+        node_ = nullptr;
     }
 
     ~Rpc()
     {
+        node_= nullptr;
     }
 
 public:
@@ -24,10 +26,9 @@ public:
 
     bool getRawMempool(json& json_rawmempool);
 public:
-    bool setRpc(std::string node_url, std::string auth)
+    bool setNode(Node* node)
     {
-        node_url_ = node_url;
-        auth_ = auth;
+        node_ = node;
         return true;
     }    
 
@@ -35,8 +36,7 @@ public:
 
     bool structRpc(const std::string& method, const json& json_params, json& json_post);	
 protected:
-    std::string node_url_;
-    std::string auth_;
+    Node* node_;
 
 };
 #endif // RPC_H

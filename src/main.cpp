@@ -105,10 +105,15 @@ static void RunJob()
     Job contraller;
     Job::s_base_ = event_base_new();
 
-    std::string node_url = s_json_conf["nodeurl"].get<std::string>();
-    std::string auth = s_json_conf["auth"].get<std::string>();
     Rpc rpc;
-    rpc.setRpc(node_url, auth);
+    Node* node = new Node();
+    json json_node = s_json_conf["node"];
+    node->url  = json_node["url"].get<std::string>();
+    node->host = json_node["host"].get<std::string>();
+    node->port = json_node["port"].get<int>();
+    node->auth = json_node["auth"].get<std::string>();
+
+    rpc.setNode(node);
 
     Syncer::instance().setRpc(rpc);
     contraller.registerJob(Syncer::instance());

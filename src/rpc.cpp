@@ -3,30 +3,6 @@
 #include <iostream>
 #include <chrono>
 #include <fstream>
-
-static bool CurlPost(const std::string& url, const json &json_post, const std::string& auth, json& json_response)
-{
-    CurlParams curl_params;
-    curl_params.auth = auth;
-    curl_params.url = url;
-    // curl_params.content_type = "content-type:text/plain";
-    curl_params.data = json_post.dump();
-    std::string response;
-    bool ret = CurlPostParams(curl_params,response);
-    if (!ret)
-        return false;
-    //LOG(INFO) << response;
-    json_response = json::parse(response);
-    if (!json_response["error"].is_null())
-    {
-        LOG(ERROR) << response;
-        LOG(ERROR) << curl_params.data;
-        return false;
-    }
-
-    return true;
-}
-
 bool Rpc::structRpc(const std::string& method, const json& json_params, json& json_post)
 {
     json_post["jsonrpc"] = "2.0";
@@ -122,7 +98,27 @@ bool Rpc::getRawTransaction(const std::string& txid, json& json_tx)
 
 bool Rpc::rpcNode(const json &json_post, json& json_response)
 {
-    return CurlPost(node_url_,json_post,auth_, json_response);
+    HttpParams http_params;
+    http_params.node = node_;
+    http_params.json_post = json_post;
+   
+    std::string response;
+    bool ret = EventPost(http_params, response);
+    if(!ret)
+    {
+        LOG(ERROR) << "CORE ERROR: " << json_post.dump(4);
+        return false;
+    }
+
+    json_response = json::parse(response);
+    if (!json_response["error"].is_null())
+    {
+        LOG(ERROR) << "node return error";
+        LOG(ERROR) << json_post.dump(4);
+        LOG(ERROR) << response;
+        return false;
+    }
+    return ret;
 }
 
 

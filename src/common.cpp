@@ -15,8 +15,7 @@ static size_t ReplyCallback(void *ptr, size_t size, size_t nmemb, void *stream)
     return size * nmemb;
 }
 
-
-std::string EncodeBase64(const unsigned char* pch, size_t len)
+static std::string EncodeBase64(const unsigned char* pch, size_t len)
 {
     static const char *pbase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -62,7 +61,7 @@ std::string EncodeBase64(const unsigned char* pch, size_t len)
     return strRet;
 }
 
-std::string EncodeBase64(const std::string& str)
+static std::string EncodeBase64(const std::string& str)
 {
     return EncodeBase64((const unsigned char*)str.c_str(), str.size());
 }
@@ -78,8 +77,7 @@ struct HTTPReply
 };
 static const int DEFAULT_HTTP_CLIENT_TIMEOUT = 900;
 
-
-void http_request_done(struct evhttp_request *req, void *ctx)
+static void http_request_done(struct evhttp_request *req, void *ctx)
 {
     HTTPReply *reply = static_cast<HTTPReply *>(ctx);
 
@@ -105,8 +103,7 @@ void http_request_done(struct evhttp_request *req, void *ctx)
     }
 }
 
-
-const char *http_errorstring(int code)
+static const char *http_errorstring(int code)
 {
     switch (code)
     {
@@ -129,7 +126,6 @@ const char *http_errorstring(int code)
     }
 }
 
-
 #if LIBEVENT_VERSION_NUMBER >= 0x02010300
 static void http_error_cb(enum evhttp_request_error err, void *ctx) {
     HTTPReply *reply = static_cast<HTTPReply *>(ctx);
@@ -138,25 +134,29 @@ static void http_error_cb(enum evhttp_request_error err, void *ctx) {
 #endif
 
 
-bool EventPostParams(const std::string& str_request, std::string& reply)
+bool EventPost(const HttpParams &params, std::string &reply)
 {
-    std::string host = "192.168.3.203";
+  //  std::string host = "192.168.3.203";
       // Get credentials
-    std::string strRPCUserColonPass = "dev:a";   
-    int port = 8332;
+ //   std::string strRPCUserColonPass = "dev:a";   
+//    int port = 8332;
     
     raii_event_base base = obtain_event_base();
 
     // Synchronously look up hostname
     raii_evhttp_connection evcon =
-        obtain_evhttp_connection_base(base.get(), host, port);
+        obtain_evhttp_connection_base(base.get(), params.node->host, params.node->port);//host, port);
+
     evhttp_connection_set_timeout(
         evcon.get(),
         DEFAULT_HTTP_CLIENT_TIMEOUT);
+
     HTTPReply response;
     raii_evhttp_request req =
         obtain_evhttp_request(http_request_done, (void *)&response);
-    if (req == nullptr) throw std::runtime_error("create http request failed");
+
+    if (req == nullptr) 
+        throw std::runtime_error("create http request failed");
 #if LIBEVENT_VERSION_NUMBER >= 0x02010300
     evhttp_request_set_error_cb(req.get(), http_error_cb);
 #endif
@@ -164,15 +164,15 @@ bool EventPostParams(const std::string& str_request, std::string& reply)
 
     struct evkeyvalq *output_headers = evhttp_request_get_output_headers(req.get());
     assert(output_headers);
-    evhttp_add_header(output_headers, "Host", host.c_str());
+    evhttp_add_header(output_headers, "Host", params.node->host.c_str());//host.c_str());
     evhttp_add_header(output_headers, "Connection", "close");
-    evhttp_add_header(output_headers, "Authorization", (std::string("Basic ") + EncodeBase64((const unsigned char*)strRPCUserColonPass.c_str(), strRPCUserColonPass.size())).c_str());
+    evhttp_add_header(output_headers, "Authorization", (std::string("Basic ") + EncodeBase64((const unsigned char*)params.node->auth.c_str(), params.node->auth.size())).c_str());
   // Attach request data
    // std::string strRequest = JSONRPCRequestObj(strMethod, params, 1).dump() + "\n";
     struct evbuffer *output_buffer = evhttp_request_get_output_buffer(req.get());
     assert(output_buffer);
     //evbuffer_add(output_buffer, strRequest.data(), strRequest.size());
-    evbuffer_add(output_buffer, str_request.data(), str_request.size());
+    evbuffer_add(output_buffer, params.json_post.dump().data(), params.json_post.dump().size());
 
     // check if we should use a special wallet endpoint
     std::string endpoint = "/";
@@ -190,59 +190,65 @@ bool EventPostParams(const std::string& str_request, std::string& reply)
 
     reply = response.body;
 //    std::cout <<reply << std::endl;
-    return true;
- /*if (response.status == 0)
+
+   
+    bool ret = true;
+    if (response.status == 0)
     {
-        throw CConnectionFailed(strprintf(
-            "couldn't connect to server: %s (code %d)\n(make sure server is "
-            "running and you are connecting to the correct RPC port)",
-            http_errorstring(response.error), response.error));
+       // throw CConnectionFailed(strprintf(
+       LOG(ERROR) <<"couldn't connect to server:  (code) (make sure server is ";
+       LOG(ERROR) << "running and you are connecting to the correct RPC port)";
+         //   http_errorstring(response.error), response.error));
+       ret = false;
+
     }
     else if (response.status == HTTP_UNAUTHORIZED)
     {
-        throw std::runtime_error("incorrect rpcuser or rpcpassword (authorization failed)");
+        LOG(ERROR) << "incorrect rpcuser or rpcpassword (authorization failed)";
+        //throw std::runtime_error("incorrect rpcuser or rpcpassword (authorization failed)");
     }
     else if (response.status >= 400 && response.status != HTTP_BAD_REQUEST &&
                response.status != HTTP_NOT_FOUND &&
                response.status != HTTP_INTERNAL_SERVER_ERROR)
     {
-        throw std::runtime_error(strprintf("server returned HTTP error %d", response.status));
+        LOG(ERROR) << "server returned HTTP error";
+        //throw std::runtime_error(strprintf("server returned HTTP error %d", response.status));
     }
     else if (response.body.empty())
     {
-        throw std::runtime_error("no response from server");
+        LOG(ERROR) << "no response from server";
+        //throw std::runtime_error("no response from server");
     }
 
     // Parse reply
     json json_reply = json::parse(response.body);
     return json_reply;
-    */
+    
 }
 
-bool CurlPostParams(const CurlParams &params, std::string &response)
+bool CurlPost(const HttpParams &params, std::string &response)
 {
-    return EventPostParams(params.data, response);
-
     CURL *curl = curl_easy_init();
     struct curl_slist *headers = NULL;
     CURLcode res;
     response.clear();
     std::string error_str ;
     //error_str.clear();
+    std::string post_data = params.json_post.dump();
     if (curl)
     {
-        headers = curl_slist_append(headers, params.content_type.c_str());
+        headers = curl_slist_append(headers, params.node->content_type.c_str());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_URL, params.url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)params.data.size());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params.data.c_str());
+        curl_easy_setopt(curl, CURLOPT_URL, params.node->url.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)post_data.size());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data.c_str());
 
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ReplyCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
 
-        if(params.need_auth)
+        if(params.node->need_auth)
         {
-            curl_easy_setopt(curl, CURLOPT_USERPWD, params.auth.c_str());
+            curl_easy_setopt(curl, CURLOPT_USERPWD, params.node->auth.c_str());
             curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
         }
         //curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 0);
