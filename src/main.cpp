@@ -7,6 +7,10 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include "syncer.h"
+#include <thread>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 static json s_json_conf;
 
 static bool ParseCmd(int argc,char*argv[])
@@ -117,9 +121,24 @@ static void RunJob()
 
     Syncer::instance().setRpc(rpc);
     contraller.registerJob(Syncer::instance());
+
     contraller.run();
 }
-
+void daemonize(void)
+{
+    int fd;
+    if(fork() != 0)
+        exit(0);
+    setsid();
+    if(fd = open("/dev/null", O_RDWR, 0) != -1)
+    {
+        dup2(fd, STDIN_FILENO);
+        dup2(fd, STDOUT_FILENO);
+        dup2(fd, STDERR_FILENO);
+        if(fd > STDERR_FILENO)
+            close(fd);
+    }
+}
 
 int main (int argc,char*argv[])
 {
@@ -128,20 +147,20 @@ int main (int argc,char*argv[])
     assert(InitLog(log_path));
     assert(OpenDB());
     bool back_run = s_json_conf["daemon"].get<bool>();
-   
-    RunJob();
+
     if (back_run)
     {
         fprintf(stdout, "Bitcoin server starting\n");
 
         // Daemonize
-        if (daemon(1, 0)) 
+        //if (daemon(1, 0)) 
         { // don't chdir (1), do close FDs (0)
             fprintf(stderr, "Error: daemon() failed: %s\n", strerror(errno));
-            return 0;
         }
 
+        std::cout << "don't support daemon" << std::endl;
     }
+    RunJob();
     return 0;
 
 }
