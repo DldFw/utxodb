@@ -192,14 +192,13 @@ bool EventPost(const HttpParams &params, std::string &reply)
 //    std::cout <<reply << std::endl;
 
    
-    bool ret = true;
+    bool ret = false;
     if (response.status == 0)
     {
        // throw CConnectionFailed(strprintf(
        LOG(ERROR) <<"couldn't connect to server:  (code) (make sure server is ";
        LOG(ERROR) << "running and you are connecting to the correct RPC port)";
          //   http_errorstring(response.error), response.error));
-       ret = false;
 
     }
     else if (response.status == HTTP_UNAUTHORIZED)
@@ -219,11 +218,11 @@ bool EventPost(const HttpParams &params, std::string &reply)
         LOG(ERROR) << "no response from server";
         //throw std::runtime_error("no response from server");
     }
-
-    // Parse reply
-    json json_reply = json::parse(response.body);
-    return json_reply;
-    
+    else
+    {
+        ret = true;
+    }
+    return ret;
 }
 
 bool CurlPost(const HttpParams &params, std::string &response)

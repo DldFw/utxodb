@@ -128,6 +128,8 @@ int main (int argc,char*argv[])
     assert(InitLog(log_path));
     assert(OpenDB());
     bool back_run = s_json_conf["daemon"].get<bool>();
+   
+    RunJob();
     if (back_run)
     {
         fprintf(stdout, "Bitcoin server starting\n");
@@ -140,7 +142,6 @@ int main (int argc,char*argv[])
         }
 
     }
-    RunJob();
-
     return 0;
+
 }
